@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 보컬 실력 검증 시스템</title>
+
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; padding: 60px 0; margin: 0; color: #2d3748; }
+        .container { max-width: 500px; margin: 0 auto; padding: 0 20px; box-sizing: border-box; }
+        .card { background: #ffffff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); padding: 35px; margin-bottom: 25px; border: none; text-align: center; box-sizing: border-box; }
+        .card-title { font-size: 24px; font-weight: 800; margin: 0 0 12px 0; color: #1a202c; }
+        .text-muted { color: #718096; font-size: 14px; line-height: 1.6; margin: 0 0 25px 0; }
+        .text-primary { color: #667eea; font-weight: bold; }
+        .form-control { display: block; width: 100%; padding: 12px; font-size: 15px; border: 2px solid #e2e8f0; border-radius: 10px; box-sizing: border-box; margin-bottom: 20px; background-color: #f7fafc; }
+        .btn-gradient { display: block; width: 100%; padding: 15px; font-size: 16px; font-weight: bold; color: #ffffff; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3); transition: all 0.2s ease; }
+        .btn-gradient:hover { opacity: 0.95; transform: translateY(-1px); }
+        .border-primary { border-top: 6px solid #667eea !important; }
+        .report-title { font-size: 18px; font-weight: 700; color: #4a5568; margin: 0 0 20px 0; }
+        .score-box-wrapper { display: flex; justify-content: center; margin: 20px 0 30px 0; }
+        .score-circle { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 130px; height: 130px; border-radius: 50%; background: #f8fafc; border: 4px solid #667eea; }
+        .score-number { font-size: 46px; font-weight: 800; color: #667eea; line-height: 1; margin-bottom: 2px; }
+        .score-label { font-size: 11px; color: #a0aec0; font-weight: 800; letter-spacing: 1px; }
+        .metrics-box { text-align: left; margin-top: 25px; }
+        .metric-item { margin-bottom: 18px; }
+        .metric-label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #4a5568; margin-bottom: 6px; }
+        .progress-container { width: 100%; background-color: #edf2f7; border-radius: 6px; height: 12px; overflow: hidden; }
+        .progress-bar { height: 100%; border-radius: 6px; }
+        .bg-info { background: linear-gradient(90deg, #0bc5ea, #3182ce); }
+        .bg-warning { background: linear-gradient(90deg, #ecc94b, #dd6b20); }
+        .footer-note { font-size: 11px; color: #718096; margin-top: 25px; background: #f7fafc; padding: 10px; border-radius: 8px; border-left: 3px solid #cbd5e0; text-align: left; line-height: 1.5; }
+        .alert-danger { background-color: #fff5f5; color: #c53030; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 15px; border: 1px solid #fed7d7; text-align: left; }
+        .loading-box { display: none; margin-top: 15px; color: #764ba2; font-weight: bold; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- 1. 파일 업로드 카드 -->
+        <div class="card">
+            <h2 class="card-title">🎤 AI 보컬 실력 검증</h2>
+            <p class="text-muted">
+                노래방 녹음본이나 반주가 포함된 노래 파일을 업로드해 주세요.<br>
+                <span class="text-primary">시스템이 목소리 주파수를 필터링</span>하여 분석합니다.
+            </p>
+
+            <form id="vocalForm" method="post" enctype="multipart/form-data">
+                <!-- 사용자가 직접 클릭해 선택하는 진짜 창 -->
+                <input class="form-control" type="file" id="audioInput" accept=".wav,.mp3,.ogg,.m4a" required>
+                <!-- 백엔드 서버가 요구하는 name="vocal_file"을 완벽하게 맞춘 가상 전송 창 (숨겨짐) -->
+                <input type="file" name="vocal_file" id="hiddenFileInput" style="display:none;">
+
+                <button type="submit" class="btn-gradient" id="submitBtn">보컬 분석 시작하기</button>
+                <div class="loading-box" id="loadingBox">🔄 브라우저 코덱 최적화 및 보컬 채점 중...</div>
+            </form>
+
+            {% if error %}
+            <div class="alert-danger">⚠️ {{ error }}</div>
+            {% endif %}
+        </div>
+
+        <!-- 2. 분석 결과 리포트 카드 -->
+        {% if result %}
+        <div class="card border-primary">
+            <h3 class="report-title">🎵 보컬 분석 리포트</h3>
+            <div class="score-box-wrapper">
+                <div class="score-circle">
+                    <div class="score-number">{{ result.total }}</div>
+                    <div class="score-label">SCORE</div>
+                </div>
+            </div>
+            <div class="metrics-box">
+                <div class="metric-item">
+                    <div class="metric-label">
+                        <span>음정 안정성 (Jitter)</span>
+                        <span style="color: #2b6cb0;">{{ result.stability }}점</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar bg-info" style="width: {{ result.stability }}%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">
+                        <span>성량 컨트롤 (Shimmer)</span>
+                        <span style="color: #dd6b20;">{{ result.volume }}점</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar bg-warning" style="width: {{ result.volume }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-note">
+                ※ 본 점수는 목소리의 미세한 떨림(Jitter)과 진폭 변화율(Shimmer) 주파수 데이터를 추출·필터링하여 산출되었습니다.
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        document.getElementById('vocalForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const audioInput = document.getElementById('audioInput');
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingBox = document.getElementById('loadingBox');
+
+            if (!audioInput.files.length) return;
+
+            submitBtn.disabled = true;
+            loadingBox.style.display = 'block';
+
+            const originalFile = audioInput.files[0]; // ★ 버그 수정: 리스트가 아닌 단일 파일 객체 정확히 추출
+            const originalName = originalFile.name;
+            const ext = originalName.split('.').pop().toLowerCase();
+
+            // 이미 .wav 파일이라면 변환 없이 바로 전송 처리
+            if (ext === 'wav') {
+                proceedSubmit(originalFile);
+                return;
+            }
+
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const arrayBuffer = await originalFile.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const wavBlob = bufferToWav(audioBuffer);
+
+                const baseName = originalName.substring(0, originalName.lastIndexOf('.'));
+                const convertedFile = new File([wavBlob], `${baseName}.wav`, { type: 'audio/wav' });
+
+                proceedSubmit(convertedFile);
+            } catch (err) {
+                console.error(err);
+                // 브라우저 해독 우회 불가 시 원본 파일 그대로 백업 전송
+                proceedSubmit(originalFile);
+            }
+        });
+
+        // ★ 버그 완벽 수정: 가상 폼의 파일 객체 주입 대상을 정확히 바인딩하여 백엔드로 유실 없이 토스
+        function proceedSubmit(fileObject) {
+            const hiddenInput = document.getElementById('hiddenFileInput');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(fileObject);
+
+            hiddenInput.files = dataTransfer.files;
+
+            // 딜레이 없이 폼 제출 실행
+            document.getElementById('vocalForm').submit();
+        }
+
+        function bufferToWav(buffer) {
+            let numOfChan = buffer.numberOfChannels,
+                length = buffer.length * numOfChan * 2 + 44,
+                bufferArr = new ArrayBuffer(length),
+                view = new DataView(bufferArr),
+                channels = [], i, sample,
+                offset = 0,
+                pos = 0;
+
+            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+
+            setUint32(0x46464952); // "RIFF"
+            setUint32(length - 8);
+            setUint32(0x45564157); // "WAVE"
+            setUint32(0x20746d66); // "fmt " chunk
+            setUint32(16);
+            setUint16(1);
+            setUint16(numOfChan);
+            setUint32(buffer.sampleRate);
+            setUint32(buffer.sampleRate * 2 * numOfChan);
+            setUint16(numOfChan * 2);
+            setUint16(16);
+            setUint32(0x61746164);
+            setUint32(length - pos - 4);
+
+            for (i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+
+            while (pos < length) {
+                for (i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+            return new Blob([view], { type: 'audio/wav' });
+        }
+    </script>
+</body>
+</html>

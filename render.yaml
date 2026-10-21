@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: vocal-pybo-app
+    env: docker
+    plan: free
+    region: singapore # 한국과 가장 가까운 아시아 리전
+    envVars:
+      - key: FLASK_APP
+        value: pybo:create_app
+      - key: FLASK_ENV
+        value: production
